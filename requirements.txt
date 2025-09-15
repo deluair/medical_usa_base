@@ -1,0 +1,20 @@
+# Web Framework
+flask>=2.0.0
+flask-cors>=3.0.0
+
+# Data Processing
+pandas>=1.5.0
+numpy>=1.21.0
+requests>=2.25.0
+
+# Data Visualization
+plotly>=5.0.0
+dash>=2.10.0
+dash-bootstrap-components>=1.0.0
+
+# API and Data Sources
+beautifulsoup4>=4.9.0
+lxml>=4.6.0
+
+# Environment
+python-dotenv>=0.19.0
