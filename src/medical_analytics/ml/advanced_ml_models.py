@@ -36,43 +36,83 @@ from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
 from sklearn.decomposition import PCA, FastICA
 from sklearn.feature_selection import SelectKBest, f_regression, RFE
 
-# Advanced ML Libraries
-import xgboost as xgb
-import lightgbm as lgb
-from catboost import CatBoostRegressor
-from prophet import Prophet
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
+# Advanced ML Libraries (Optional imports)
+try:
+    import xgboost as xgb
+    HAS_XGBOOST = True
+except ImportError:
+    HAS_XGBOOST = False
 
-# Time Series Libraries
-from statsmodels.tsa.arima.model import ARIMA
-from statsmodels.tsa.seasonal import seasonal_decompose
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
+try:
+    import lightgbm as lgb
+    HAS_LIGHTGBM = True
+except ImportError:
+    HAS_LIGHTGBM = False
+
+try:
+    from catboost import CatBoostRegressor
+    HAS_CATBOOST = True
+except ImportError:
+    HAS_CATBOOST = False
+
+try:
+    from prophet import Prophet
+    HAS_PROPHET = True
+except ImportError:
+    HAS_PROPHET = False
+
+try:
+    import tensorflow as tf
+    from tensorflow import keras
+    from tensorflow.keras import layers
+    HAS_TENSORFLOW = True
+    tf.get_logger().setLevel('ERROR')
+    print(f"DEBUG: TensorFlow imported successfully - Version: {tf.__version__}")
+except ImportError as e:
+    HAS_TENSORFLOW = False
+    print(f"DEBUG: TensorFlow import failed - Error: {e}")
+
+print(f"DEBUG: Final HAS_TENSORFLOW value: {HAS_TENSORFLOW}")
+
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch.utils.data import DataLoader, TensorDataset
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
+try:
+    from statsmodels.tsa.arima.model import ARIMA
+    from statsmodels.tsa.seasonal import seasonal_decompose
+    from statsmodels.tsa.holtwinters import ExponentialSmoothing
+    HAS_STATSMODELS = True
+except ImportError:
+    HAS_STATSMODELS = False
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
-tf.get_logger().setLevel('ERROR')
 
 from config.settings import settings, ML_MODEL_CONFIGS
 
 logger = logging.getLogger(__name__)
 
-class DeepHealthcareCostPredictor:
-    """Advanced deep learning model for healthcare cost prediction"""
-    
-    def __init__(self, input_dim: int = 20, hidden_dims: List[int] = [128, 64, 32]):
-        self.input_dim = input_dim
-        self.hidden_dims = hidden_dims
-        self.model = None
-        self.scaler = StandardScaler()
-        self.feature_selector = SelectKBest(f_regression, k=input_dim)
-        self.is_trained = False
-        self.history = None
+if HAS_TENSORFLOW:
+    class DeepHealthcareCostPredictor:
+        """Advanced deep learning model for healthcare cost prediction"""
+        
+        def __init__(self, input_dim: int = 20, hidden_dims: List[int] = [128, 64, 32]):
+            if not HAS_TENSORFLOW:
+                raise ImportError("TensorFlow is required for DeepHealthcareCostPredictor. Install with: pip install tensorflow")
+            
+            self.input_dim = input_dim
+            self.hidden_dims = hidden_dims
+            self.model = None
+            self.scaler = StandardScaler()
+            self.feature_selector = SelectKBest(f_regression, k=input_dim)
+            self.is_trained = False
+            self.history = None
         
     def build_model(self) -> keras.Model:
         """Build deep neural network for cost prediction"""
@@ -209,6 +249,17 @@ class DeepHealthcareCostPredictor:
         
         predictions = self.model.predict(X_scaled, verbose=0)
         return predictions.flatten()
+else:
+    # Placeholder class when TensorFlow is not available
+    class DeepHealthcareCostPredictor:
+        def __init__(self, input_dim: int = 20, hidden_dims: List[int] = [128, 64, 32]):
+            raise ImportError("TensorFlow is required for DeepHealthcareCostPredictor but is not installed")
+        
+        def train(self, X, y, **kwargs):
+            raise ImportError("TensorFlow is required for DeepHealthcareCostPredictor but is not installed")
+        
+        def predict(self, X):
+            raise ImportError("TensorFlow is required for DeepHealthcareCostPredictor but is not installed")
 
 class EnsembleHealthcarePredictor:
     """Ensemble model combining multiple algorithms for robust predictions"""
@@ -220,32 +271,47 @@ class EnsembleHealthcarePredictor:
         self.is_trained = False
         
     def initialize_models(self):
-        """Initialize base models for ensemble"""
-        self.models = {
-            'xgboost': xgb.XGBRegressor(
+        """Initialize base models for ensemble with availability checks"""
+        self.models = {}
+        
+        # Always available sklearn models
+        self.models['random_forest'] = RandomForestRegressor(
+            n_estimators=200, max_depth=10, random_state=42, n_jobs=-1
+        )
+        self.models['gradient_boosting'] = GradientBoostingRegressor(
+            n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42
+        )
+        
+        # Optional advanced models
+        if HAS_XGBOOST:
+            self.models['xgboost'] = xgb.XGBRegressor(
                 n_estimators=200, max_depth=6, learning_rate=0.1,
                 subsample=0.8, colsample_bytree=0.8, random_state=42
-            ),
-            'lightgbm': lgb.LGBMRegressor(
+            )
+        
+        if HAS_LIGHTGBM:
+            self.models['lightgbm'] = lgb.LGBMRegressor(
                 n_estimators=200, max_depth=6, learning_rate=0.1,
                 subsample=0.8, colsample_bytree=0.8, random_state=42, verbose=-1
-            ),
-            'catboost': CatBoostRegressor(
+            )
+        
+        if HAS_CATBOOST:
+            self.models['catboost'] = CatBoostRegressor(
                 iterations=200, depth=6, learning_rate=0.1,
                 random_seed=42, verbose=False
-            ),
-            'random_forest': RandomForestRegressor(
-                n_estimators=200, max_depth=10, random_state=42, n_jobs=-1
-            ),
-            'gradient_boosting': GradientBoostingRegressor(
-                n_estimators=200, max_depth=6, learning_rate=0.1, random_state=42
             )
-        }
         
-        # Meta-learner for stacking
-        self.meta_model = xgb.XGBRegressor(
-            n_estimators=100, max_depth=3, learning_rate=0.1, random_state=42
-        )
+        logger.info(f"Initialized {len(self.models)} models: {list(self.models.keys())}")
+        
+        # Meta-learner for stacking (use XGBoost if available, otherwise use sklearn)
+        if HAS_XGBOOST:
+            self.meta_model = xgb.XGBRegressor(
+                n_estimators=100, max_depth=3, learning_rate=0.1, random_state=42
+            )
+        else:
+            self.meta_model = GradientBoostingRegressor(
+                n_estimators=100, max_depth=3, learning_rate=0.1, random_state=42
+            )
     
     def train(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, Any]:
         """Train ensemble model with cross-validation"""
@@ -362,60 +428,84 @@ class AdvancedTimeSeriesForecaster:
         
         model_scores = {}
         
-        # Prophet model
-        try:
-            prophet_data = train_data.rename(columns={date_col: 'ds', value_col: 'y'})
-            prophet_model = Prophet(
-                yearly_seasonality=True,
-                weekly_seasonality=False,
-                daily_seasonality=False,
-                changepoint_prior_scale=0.05
-            )
-            prophet_model.fit(prophet_data)
-            
-            # Forecast on test period
-            future = prophet_model.make_future_dataframe(periods=len(test_data))
-            forecast = prophet_model.predict(future)
-            prophet_pred = forecast['yhat'].iloc[-len(test_data):].values
-            
-            prophet_score = r2_score(test_data[value_col], prophet_pred)
-            model_scores['prophet'] = prophet_score
-            self.models['prophet'] = prophet_model
-            
-        except Exception as e:
-            logger.warning(f"Prophet model failed: {e}")
+        # Prophet model (if available)
+        if HAS_PROPHET:
+            try:
+                prophet_data = train_data.rename(columns={date_col: 'ds', value_col: 'y'})
+                prophet_model = Prophet(
+                    yearly_seasonality=True,
+                    weekly_seasonality=False,
+                    daily_seasonality=False,
+                    changepoint_prior_scale=0.05
+                )
+                prophet_model.fit(prophet_data)
+                
+                # Forecast on test period
+                future = prophet_model.make_future_dataframe(periods=len(test_data))
+                forecast = prophet_model.predict(future)
+                prophet_pred = forecast['yhat'].iloc[-len(test_data):].values
+                
+                prophet_score = r2_score(test_data[value_col], prophet_pred)
+                model_scores['prophet'] = prophet_score
+                self.models['prophet'] = prophet_model
+                
+            except Exception as e:
+                logger.warning(f"Prophet model failed: {e}")
         
-        # ARIMA model
-        try:
-            from statsmodels.tsa.arima.model import ARIMA
-            arima_model = ARIMA(train_data[value_col], order=(2, 1, 2))
-            arima_fitted = arima_model.fit()
-            
-            arima_pred = arima_fitted.forecast(steps=len(test_data))
-            arima_score = r2_score(test_data[value_col], arima_pred)
-            model_scores['arima'] = arima_score
-            self.models['arima'] = arima_fitted
-            
-        except Exception as e:
-            logger.warning(f"ARIMA model failed: {e}")
+        # ARIMA model (if statsmodels available)
+        if HAS_STATSMODELS:
+            try:
+                arima_model = ARIMA(train_data[value_col], order=(2, 1, 2))
+                arima_fitted = arima_model.fit()
+                
+                arima_pred = arima_fitted.forecast(steps=len(test_data))
+                arima_score = r2_score(test_data[value_col], arima_pred)
+                model_scores['arima'] = arima_score
+                self.models['arima'] = arima_fitted
+                
+            except Exception as e:
+                logger.warning(f"ARIMA model failed: {e}")
         
-        # Exponential Smoothing
+        # Exponential Smoothing (if statsmodels available)
+        if HAS_STATSMODELS:
+            try:
+                exp_smooth_model = ExponentialSmoothing(
+                    train_data[value_col],
+                    trend='add',
+                    seasonal='add',
+                    seasonal_periods=12
+                )
+                exp_smooth_fitted = exp_smooth_model.fit()
+                
+                exp_smooth_pred = exp_smooth_fitted.forecast(steps=len(test_data))
+                exp_smooth_score = r2_score(test_data[value_col], exp_smooth_pred)
+                model_scores['exp_smoothing'] = exp_smooth_score
+                self.models['exp_smoothing'] = exp_smooth_fitted
+                
+            except Exception as e:
+                logger.warning(f"Exponential Smoothing failed: {e}")
+        
+        # Simple linear trend model (always available as fallback)
         try:
-            exp_smooth_model = ExponentialSmoothing(
-                train_data[value_col],
-                trend='add',
-                seasonal='add',
-                seasonal_periods=12
-            )
-            exp_smooth_fitted = exp_smooth_model.fit()
+            from sklearn.linear_model import LinearRegression
             
-            exp_smooth_pred = exp_smooth_fitted.forecast(steps=len(test_data))
-            exp_smooth_score = r2_score(test_data[value_col], exp_smooth_pred)
-            model_scores['exp_smoothing'] = exp_smooth_score
-            self.models['exp_smoothing'] = exp_smooth_fitted
+            # Create time features
+            train_data_trend = train_data.copy()
+            train_data_trend['time_idx'] = range(len(train_data_trend))
+            
+            lr_model = LinearRegression()
+            lr_model.fit(train_data_trend[['time_idx']], train_data_trend[value_col])
+            
+            # Predict on test data
+            test_time_idx = np.arange(len(train_data), len(train_data) + len(test_data)).reshape(-1, 1)
+            lr_pred = lr_model.predict(test_time_idx)
+            
+            lr_score = r2_score(test_data[value_col], lr_pred)
+            model_scores['linear_trend'] = lr_score
+            self.models['linear_trend'] = lr_model
             
         except Exception as e:
-            logger.warning(f"Exponential Smoothing failed: {e}")
+            logger.warning(f"Linear trend model failed: {e}")
         
         # Select best model
         if model_scores:
@@ -454,6 +544,24 @@ class AdvancedTimeSeriesForecaster:
         
         elif self.best_model == 'exp_smoothing':
             forecast = self.models['exp_smoothing'].forecast(steps=periods)
+            dates = pd.date_range(
+                start=self.data.iloc[-1, 0] + pd.Timedelta(days=1),
+                periods=periods,
+                freq='D'
+            )
+            return pd.DataFrame({
+                'ds': dates,
+                'yhat': forecast,
+                'yhat_lower': forecast * 0.95,
+                'yhat_upper': forecast * 1.05
+            })
+        
+        elif self.best_model == 'linear_trend':
+            # Generate future time indices
+            last_time_idx = len(self.data) - 1
+            future_time_idx = np.arange(last_time_idx + 1, last_time_idx + 1 + periods).reshape(-1, 1)
+            forecast = self.models['linear_trend'].predict(future_time_idx)
+            
             dates = pd.date_range(
                 start=self.data.iloc[-1, 0] + pd.Timedelta(days=1),
                 periods=periods,
@@ -546,25 +654,34 @@ class AdvancedModelManager:
     """Enhanced model manager with advanced ML capabilities"""
     
     def __init__(self):
-        self.models = {
-            'deep_cost_predictor': DeepHealthcareCostPredictor(),
-            'ensemble_predictor': EnsembleHealthcarePredictor(),
-            'advanced_forecaster': AdvancedTimeSeriesForecaster(),
-            'anomaly_detector': HealthcareAnomalyDetector()
-        }
+        # Only initialize models that have their dependencies available
+        self.models = {}
+        
+        # Always available: Ensemble predictor and anomaly detector
+        self.models['ensemble_predictor'] = EnsembleHealthcarePredictor()
+        self.models['advanced_forecaster'] = AdvancedTimeSeriesForecaster()
+        self.models['anomaly_detector'] = HealthcareAnomalyDetector()
+        
+        # Only add deep learning if TensorFlow is available
+        if HAS_TENSORFLOW:
+            self.models['deep_cost_predictor'] = DeepHealthcareCostPredictor()
+        else:
+            logger.warning("TensorFlow not available - Deep learning models disabled")
+        
         self.model_cache_dir = settings.MODEL_CACHE_DIR
         os.makedirs(self.model_cache_dir, exist_ok=True)
         
     def train_all_models(self, data: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
-        """Train all advanced models"""
+        """Train all available advanced models"""
         results = {}
         
-        # Train deep cost predictor
-        if 'cost_features' in data and 'cost_targets' in data:
+        # Train deep cost predictor (if available)
+        if 'deep_cost_predictor' in self.models and 'cost_features' in data and 'cost_targets' in data:
             try:
                 results['deep_cost_predictor'] = self.models['deep_cost_predictor'].train(
                     data['cost_features'], data['cost_targets']
                 )
+                logger.info("Deep cost predictor trained successfully")
             except Exception as e:
                 logger.error(f"Deep cost predictor training failed: {e}")
         
@@ -574,6 +691,7 @@ class AdvancedModelManager:
                 results['ensemble_predictor'] = self.models['ensemble_predictor'].train(
                     data['ensemble_features'], data['ensemble_targets']
                 )
+                logger.info("Ensemble predictor trained successfully")
             except Exception as e:
                 logger.error(f"Ensemble predictor training failed: {e}")
         
@@ -583,6 +701,7 @@ class AdvancedModelManager:
                 results['advanced_forecaster'] = self.models['advanced_forecaster'].train(
                     data['time_series_data'], 'date', 'value'
                 )
+                logger.info("Advanced forecaster trained successfully")
             except Exception as e:
                 logger.error(f"Advanced forecaster training failed: {e}")
         
@@ -592,9 +711,11 @@ class AdvancedModelManager:
                 results['anomaly_detector'] = self.models['anomaly_detector'].train(
                     data['anomaly_features']
                 )
+                logger.info("Anomaly detector trained successfully")
             except Exception as e:
                 logger.error(f"Anomaly detector training failed: {e}")
         
+        logger.info(f"Training completed for {len(results)} models")
         return results
     
     def get_comprehensive_predictions(self, input_data: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
